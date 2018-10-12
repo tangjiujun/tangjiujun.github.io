@@ -1,0 +1,607 @@
+<!doctype html>
+<html class="no-js" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+    
+  TangJiujun's Techblog
+  
+  </title>
+  
+  
+  <link href="atom.xml" rel="alternate" title="TangJiujun's Techblog" type="application/atom+xml">
+    <link rel="stylesheet" href="asset/css/foundation.min.css" />
+    <link rel="stylesheet" href="asset/css/docs.css" />
+    <script src="asset/js/vendor/modernizr.js"></script>
+    <script src="asset/js/vendor/jquery.js"></script>
+  <script src="asset/highlightjs/highlight.pack.js"></script>
+  <link href="asset/highlightjs/styles/github.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script>hljs.initHighlightingOnLoad();</script>
+<script type="text/javascript">
+  function before_search(){
+    var searchVal = 'site:blog.tangjiujun.com ' + document.getElementById('search_input').value;
+    document.getElementById('search_q').value = searchVal;
+    return true;
+  }
+</script>
+  </head>
+  <body class="antialiased hide-extras">
+    
+    <div class="marketing off-canvas-wrap" data-offcanvas>
+      <div class="inner-wrap">
+
+
+<nav class="top-bar docs-bar hide-for-small" data-topbar>
+
+
+  <section class="top-bar-section">
+  <div class="row">
+      <div style="position: relative;width:100%;"><div style="position: absolute; width:100%;">
+        <ul id="main-menu" class="left">
+        
+        <li id=""><a target="_self" href="index.html">Home</a></li>
+        
+        <li id=""><a target="_self" href="archives.html">Archives</a></li>
+        
+        <li id=""><a target="_self" href="projects.html">Projects</a></li>
+        
+        <li id=""><a target="_self" href="about.html">About</a></li>
+        
+        </ul>
+
+        <ul class="right" id="search-wrap">
+          <li>
+<form target="_blank" onsubmit="return before_search();" action="https://google.com/search" method="get">
+    <input type="hidden" id="search_q" name="q" value="" />
+    <input tabindex="1" type="search" id="search_input"  placeholder="Search"/>
+</form>
+</li>
+          </ul>
+      </div></div>
+  </div>
+  </section>
+
+</nav>
+
+        <nav class="tab-bar show-for-small">
+  <a href="javascript:void(0)" class="left-off-canvas-toggle menu-icon">
+    <span> &nbsp; TangJiujun's Techblog</span>
+  </a>
+</nav>
+
+<aside class="left-off-canvas-menu">
+      <ul class="off-canvas-list">
+        
+        <li><a target="_self" href="index.html">Home</a></li>
+        
+        <li><a target="_self" href="archives.html">Archives</a></li>
+        
+        <li><a target="_self" href="projects.html">Projects</a></li>
+        
+        <li><a target="_self" href="about.html">About</a></li>
+        
+
+    <li><label>Categories</label></li>
+
+        
+            <li><a href="Java.html">Java</a></li>
+        
+            <li><a href="Ruby.html">Ruby</a></li>
+        
+            <li><a href="Others.html">Others</a></li>
+        
+            <li><a href="Database.html">Database</a></li>
+        
+            <li><a href="Spring%20Boot.html">Spring Boot</a></li>
+         
+
+      </ul>
+    </aside>
+
+<a class="exit-off-canvas" href="#"></a>
+
+
+        <section id="main-content" role="main" class="scroll-container">
+        
+       
+
+ <script type="text/javascript">
+	$(function(){
+		$('#menu_item_index').addClass('is_active');
+	});
+</script>
+<div class="row">
+	<div class="large-8 medium-8 columns">
+		<div class="markdown-body home-categories">
+		
+			<div class="article">
+                <a class="clearlink" href="spring-amqp-usage.html">
+                
+                  <h1>Spring-AMQP 的使用记录</h1>
+                  <div class="a-content">
+                      
+                      <div class="a-content-text">
+                        
+                        	<h3 id="toc_0">Spring-AMQP 特性</h3>
+
+<ul>
+<li>Listener container 使用 POJO 异步处理消息</li>
+<li>提供一个高度抽象的 template（RabbitTemplate）发送和接收消息</li>
+<li>使用 RabbitAdmin 来自动声明队列、Exchange 和 Binding</li>
+</ul>
+
+<h3 id="toc_1">队列、Exchange 和 Binding 的设置</h3>
+
+<ul>
+<li><p>Spring way<br/>
+使用 <code>spring-boot-starter-amqp</code> 会自动配置 <code>ConnectionFactory</code>、<code>RabbitTemplate</code> 和 <code>AmqpAdmin</code> 三个 Bean。</p>
+<pre><code class="language-java">@Configuration
+public class RabbitConfiguration {<br/>
+  @Bean<br/>
+  public DirectExchange exchange() {<br/>
+      return new DirectExchange(&quot;infrastructure.direct&quot;);<br/>
+  }<br/>
+  @Bean<br/>
+  public Queue queue(){<br/>
+      return new Queue(&quot;queueName&quot;);<br/>
+  }<br/>
+  @Bean<br/>
+  public Binding binding(){<br/>
+      return BindingBuilder.bind(queue()).to(exchange()).with(&quot;routeKey&quot;);<br/>
+  }<br/>
+}
+</code></pre></li>
+<li><p>Just java</p>
+<pre><code class="language-java">ConnectionFactory connectionFactory = new CachingConnectionFactory();
+RabbitAdmin amqpAdmin = new RabbitAdmin(connectionFactory);<br/>
+Queue queue = new Queue(&quot;quueuName&quot;);<br/>
+DirectExchange exchange = new DirectExchange(&quot;exchangeName&quot;);<br/>
+amqpAdmin.declareQueue(queue);<br/>
+amqpAdmin.declareExchange(exchange);<br/>
+amqpAdmin.declareBinding(BindingBuilder.bind(queue).to(exchange).with(&quot;routeKey&quot;));
+</code></pre></li>
+</ul>
+
+
+                        
+                      </div>
+                  </div>
+                </a>
+                <div class="read-more clearfix">
+                  <div class="more-left left">
+                   <a href="spring-amqp-usage.html">Read more</a>&nbsp;&nbsp; 
+                    <span class="date">2016/3/21</span>
+                    <span>posted in&nbsp;</span> 
+          				  
+          					    <span class="posted-in"><a href='Spring%20Boot.html'>Spring Boot</a></span>
+          				   
+                  </div>
+                  <div class="more-right right">
+                  <span class="comments">
+                      
+                        <a href="http://blog.tangjiujun.com/spring-amqp-usage.html#disqus_thread">comments</a>
+                      
+
+                       
+                  </span>
+                  </div>
+                </div>
+              </div><!-- article -->
+        
+			<div class="article">
+                <a class="clearlink" href="spring-boot-integration-test.html">
+                
+                  <h1>Spring Boot Integration 测试</h1>
+                  <div class="a-content">
+                      
+                      <div class="a-content-text">
+                        
+                        	<ol>
+<li><p>新建一个测试配置类 TestApplication</p>
+<pre><code class="language-java">@Configuration
+@EnableAutoConfiguration<br/>
+@ComponentScan(<br/>
+      excludeFilters = @ComponentScan.Filter(value = {<br/>
+              Application.class,<br/>
+              ApplicationChecker.class<br/>
+      }, type = FilterType.ASSIGNABLE_TYPE))<br/>
+public class TestApplication {<br/>
+  // 配置测试使用内存数据库<br/>
+  @Bean<br/>
+  public DataSource dataSource() {<br/>
+      return new EmbeddedDatabaseBuilder().setType(EmbeddedDatabaseType.H2).build();<br/>
+  }<br/>
+}
+</code></pre></li>
+</ol>
+
+
+                        
+                      </div>
+                  </div>
+                </a>
+                <div class="read-more clearfix">
+                  <div class="more-left left">
+                   <a href="spring-boot-integration-test.html">Read more</a>&nbsp;&nbsp; 
+                    <span class="date">2016/2/1</span>
+                    <span>posted in&nbsp;</span> 
+          				  
+          					    <span class="posted-in"><a href='Spring%20Boot.html'>Spring Boot</a></span>
+          				   
+                  </div>
+                  <div class="more-right right">
+                  <span class="comments">
+                      
+                        <a href="http://blog.tangjiujun.com/spring-boot-integration-test.html#disqus_thread">comments</a>
+                      
+
+                       
+                  </span>
+                  </div>
+                </div>
+              </div><!-- article -->
+        
+			<div class="article">
+                <a class="clearlink" href="spring-data-redis-usage.html">
+                
+                  <h1>Spring-data-redis 的使用记录</h1>
+                  <div class="a-content">
+                      
+                      <div class="a-content-text">
+                        
+                        	<h3 id="toc_0">开始向导</h3>
+
+<p>添加 dependency <code>spring-boot-starter-redis</code>，它默认使用 <code>jedis</code>（还支持 JRedis，SRP 和 Lettuce）<br/>
+一个简单的 Hash 示例：</p>
+
+<pre><code class="language-java">@SpringBootApplication
+public class RedisDemo implements CommandLineRunner {
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    public static void main(String[] args) {
+        SpringApplication.run(RedisDemo.class).close();
+    }
+
+    public void run(String... args) throws Exception {
+        BoundHashOperations&lt;String, String, String&gt; ops = stringRedisTemplate.boundHashOps(&quot;com.foo&quot;);
+        ops.put(&quot;name&quot;, &quot;bar&quot;);
+        ops.put(&quot;sex&quot;, &quot;man&quot;);
+        System.out.println(ops.entries()); // 打印结果：{name=bar, sex=man}
+    }
+}
+</code></pre>
+
+
+                        
+                      </div>
+                  </div>
+                </a>
+                <div class="read-more clearfix">
+                  <div class="more-left left">
+                   <a href="spring-data-redis-usage.html">Read more</a>&nbsp;&nbsp; 
+                    <span class="date">2016/1/9</span>
+                    <span>posted in&nbsp;</span> 
+          				  
+          					    <span class="posted-in"><a href='Spring%20Boot.html'>Spring Boot</a></span>
+          				   
+                  </div>
+                  <div class="more-right right">
+                  <span class="comments">
+                      
+                        <a href="http://blog.tangjiujun.com/spring-data-redis-usage.html#disqus_thread">comments</a>
+                      
+
+                       
+                  </span>
+                  </div>
+                </div>
+              </div><!-- article -->
+        
+			<div class="article">
+                <a class="clearlink" href="spring-data-jpa-one-to-one.html">
+                
+                  <h1>Spring Data JPA 一对一关联</h1>
+                  <div class="a-content">
+                      
+                      <div class="a-content-text">
+                        
+                        	<h3 id="toc_0">使用注意</h3>
+
+<pre><code class="language-java">User user = new User();
+user.setUsername(&quot;foo&quot;);
+Email email = new Email();
+email.setUser(user);  // 必须显示设置 user，否则关联字段值会为空
+email.setEmail(&quot;foo@bar.com&quot;);
+user.setEmail(email); 
+userRepository.save(user);
+</code></pre>
+
+
+                        
+                      </div>
+                  </div>
+                </a>
+                <div class="read-more clearfix">
+                  <div class="more-left left">
+                   <a href="spring-data-jpa-one-to-one.html">Read more</a>&nbsp;&nbsp; 
+                    <span class="date">2015/11/25</span>
+                    <span>posted in&nbsp;</span> 
+          				  
+          					    <span class="posted-in"><a href='Spring%20Boot.html'>Spring Boot</a></span>
+          				   
+                  </div>
+                  <div class="more-right right">
+                  <span class="comments">
+                      
+                        <a href="http://blog.tangjiujun.com/spring-data-jpa-one-to-one.html#disqus_thread">comments</a>
+                      
+
+                       
+                  </span>
+                  </div>
+                </div>
+              </div><!-- article -->
+        
+			<div class="article">
+                <a class="clearlink" href="spring-data-jpa-one-to-many.html">
+                
+                  <h1>Spring Data JPA 一对多关联</h1>
+                  <div class="a-content">
+                      
+                      <div class="a-content-text">
+                        
+                        	<h2 id="toc_0">一对多单向关联</h2>
+
+<h3 id="toc_1">通过有 @Id 注解的字段进行关联</h3>
+
+<pre><code class="language-java">public class User {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    @Column
+    private String username;
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = &quot;user_id&quot;)
+    private Set&lt;Email&gt; emails = new HashSet&lt;&gt;();
+}
+public class Email {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    /* 默认关联字段名为：驼峰类名转为下划线方式 ＋ &quot;_&quot; + @Id 注解的字段名。
+    例如 User 的 username 字段有 @Id 注解，则 Email 表关联的字段就默认为 user_username */
+    @Column(name = &quot;user_id&quot;)
+    private Integer userId; 
+    @Column
+    private String email;
+}
+</code></pre>
+
+
+                        
+                      </div>
+                  </div>
+                </a>
+                <div class="read-more clearfix">
+                  <div class="more-left left">
+                   <a href="spring-data-jpa-one-to-many.html">Read more</a>&nbsp;&nbsp; 
+                    <span class="date">2015/10/30</span>
+                    <span>posted in&nbsp;</span> 
+          				  
+          					    <span class="posted-in"><a href='Spring%20Boot.html'>Spring Boot</a></span>
+          				   
+                  </div>
+                  <div class="more-right right">
+                  <span class="comments">
+                      
+                        <a href="http://blog.tangjiujun.com/spring-data-jpa-one-to-many.html#disqus_thread">comments</a>
+                      
+
+                       
+                  </span>
+                  </div>
+                </div>
+              </div><!-- article -->
+        
+              
+
+
+			<div class="row">
+			  <div class="large-6 columns">
+			  <p class="text-left" style="padding-top:25px;">
+			   <a href="all.html">&laquo; Prev Page</a>  
+			  </p>
+			  </div>
+			  <div class="large-6 columns">
+			<p class="text-right" style="padding-top:25px;">
+			 <a href="all_2.html">&raquo; Next Page</a> 
+			</p>
+			  </div>
+			</div>
+		</div>
+	</div><!-- large 8 -->
+
+ <div class="large-4 medium-4 columns">
+  <div class="hide-for-small">
+    <div id="sidebar" class="sidebar">
+          <div id="site-info" class="site-info">
+            
+                <div class="site-a-logo"><img src="media/avatar.png" /></div>
+            
+                <h1>TangJiujun's Techblog</h1>
+                <div class="site-des"></div>
+                <div class="social">
+
+
+
+
+
+
+
+
+
+<a target="_blank" class="github" target="_blank" href="https://github.com/tangjiujun" title="GitHub">GitHub</a>
+<a target="_blank" class="email" href="mailto:jiujun.tang@gmail.com" title="Email">Email</a>
+  <a target="_blank" class="rss" href="atom.xml" title="RSS">RSS</a>
+                
+              	 </div>
+          	</div>
+
+             
+
+              <div id="site-categories" class="side-item ">
+                <div class="side-header">
+                  <h2>Categories</h2>
+                </div>
+                <div class="side-content">
+
+      	<p class="cat-list">
+        
+            <a href="Java.html"><strong>Java</strong></a>
+        
+            <a href="Ruby.html"><strong>Ruby</strong></a>
+        
+            <a href="Others.html"><strong>Others</strong></a>
+        
+            <a href="Database.html"><strong>Database</strong></a>
+        
+            <a href="Spring%20Boot.html"><strong>Spring Boot</strong></a>
+         
+        </p>
+
+
+                </div>
+              </div>
+
+              <div id="site-categories" class="side-item">
+                <div class="side-header">
+                  <h2>Recent Posts</h2>
+                </div>
+                <div class="side-content">
+                <ul class="posts-list">
+	      
+		      
+			      <li class="post">
+			        <a href="spring-data-jpa-handle-amount.html">使用 Spring Data JPA 操作大量数据</a>
+			      </li>
+		     
+		  
+		      
+			      <li class="post">
+			        <a href="mysql-innodb-locks.html">关于 MySQL 中 InnoDB 事务锁的一些理解</a>
+			      </li>
+		     
+		  
+		      
+			      <li class="post">
+			        <a href="db-trigger-create.html">MySQL、SQL Server 和 Oracle 触发器的创建</a>
+			      </li>
+		     
+		  
+		      
+			      <li class="post">
+			        <a href="java-dynamic-proxy.html">代理模式及 Java 实现动态代理</a>
+			      </li>
+		     
+		  
+		      
+			      <li class="post">
+			        <a href="mysql-innodb-mvcc.html">关于 MySQL 中 InnoDB 的 MVCC 的一些理解</a>
+			      </li>
+		     
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		   
+		  		</ul>
+                </div>
+              </div>
+        </div><!-- sidebar -->
+      </div><!-- hide for small -->
+</div><!-- large 4 -->
+
+</div><!-- row -->
+
+ <div class="page-bottom clearfix">
+  <div class="row">
+   <p class="copyright">Copyright &copy; 2015
+Powered by <a target="_blank" href="http://www.mweb.im">MWeb</a>,&nbsp; 
+Theme used <a target="_blank" href="http://github.com">GitHub CSS</a>.</p>
+  </div>
+</div>
+
+        </section>
+      </div>
+    </div>
+
+
+<script type="text/javascript">
+    var disqus_shortname = 'tangjiujun'; 
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<script type="text/javascript">
+var disqus_shortname = 'tangjiujun'; 
+
+(function () {
+var s = document.createElement('script'); s.async = true;
+s.type = 'text/javascript';
+s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+(document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+}());
+</script>
+  
+    
+
+    <script src="asset/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+      function fixSidebarHeight(){
+        var w1 = $('.markdown-body').height();
+          var w2 = $('#sidebar').height();
+          if (w1 > w2) { $('#sidebar').height(w1); };
+      }
+      $(function(){
+        fixSidebarHeight();
+      })
+      $(window).load(function(){
+          fixSidebarHeight();
+      });
+     
+    </script>
+
+    
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script><script type="text/x-mathjax-config">MathJax.Hub.Config({TeX: { equationNumbers: { autoNumber: "AMS" } }});</script>
+
+
+  </body>
+</html>

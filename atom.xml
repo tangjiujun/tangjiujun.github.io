@@ -1,0 +1,1579 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[TangJiujun's Techblog]]></title>
+  <link href="http://blog.tangjiujun.com/atom.xml" rel="self"/>
+  <link href="http://blog.tangjiujun.com/"/>
+  <updated>2018-06-01T15:08:49+08:00</updated>
+  <id>http://blog.tangjiujun.com/</id>
+  <author>
+    <name><![CDATA[]]></name>
+    
+  </author>
+  <generator uri="http://www.mweb.im/">MWeb</generator>
+  
+  <entry>
+    <title type="html"><![CDATA[使用 Spring Data JPA 操作大量数据]]></title>
+    <link href="http://blog.tangjiujun.com/spring-data-jpa-handle-amount.html"/>
+    <updated>2018-02-26T10:50:50+08:00</updated>
+    <id>http://blog.tangjiujun.com/spring-data-jpa-handle-amount.html</id>
+    <content type="html"><![CDATA[
+<h3 id="toc_0">批量删除区别</h3>
+
+<p>delete() 和 deleteInBatch()<br/>
+deleteAll() 和 deleteAllInBatch()</p>
+
+<p>普通删除方法会根据唯一标识字段，生成多条 SQL 语句，而有 InBatch 的方法只会生成一条 SQL 语句</p>
+
+<h3 id="toc_1">写入大量数据</h3>
+
+<pre><code class="language-text">@Transactional
+public void save100WEntities() {
+    for (int i = 0; i &lt; 1000; i++) {
+        respsitory.save(1000Entities);
+
+         entityManager.flush();
+        entityManager.clear();
+    }
+}
+</code></pre>
+
+<h3 id="toc_2">读取大量数据</h3>
+
+<p>需要满足3个条件：</p>
+
+<ol>
+<li>ResultSetType 是 <code>ResultSet.TYPE_FORWARD_ONLY</code></li>
+<li>ResultSetConcurrency 是 <code>ResultSet.CONCUR_READ_ONLY</code></li>
+<li>FetchSize 是 <code>Integer.MIN_VALUE</code></li>
+</ol>
+
+<pre><code class="language-text">Statement statement = connection.createStatement(
+        ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+statement.setFetchSize(Integer.MIN_VALUE);
+
+@Repository
+public interface UserRepository extends JpaRepository&lt;User, Integer&gt; {
+    @QueryHints(value = @QueryHint(name = FETCH_SIZE, value = &quot;&quot; + Integer.MIN_VALUE))
+    Stream&lt;User&gt; findByIdIsNotNull();
+}
+
+@Transactional
+public void run() {
+    try (Stream&lt;User&gt; stream = userRepository.findByIdIsNotNull()) {
+        stream.forEach(user -&gt; {
+            System.out.println(user);
+            entityManager.detach(user);
+        });
+    }
+}
+</code></pre>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[关于 MySQL 中 InnoDB 事务锁的一些理解]]></title>
+    <link href="http://blog.tangjiujun.com/mysql-innodb-locks.html"/>
+    <updated>2017-06-08T22:05:01+08:00</updated>
+    <id>http://blog.tangjiujun.com/mysql-innodb-locks.html</id>
+    <content type="html"><![CDATA[
+<h2 id="toc_0">InnoDB 行锁</h2>
+
+<blockquote>
+<p>参考 <a href="http://mysql.taobao.org/monthly/2016/01/01/">MySQL · 引擎特性 · InnoDB 事务锁系统简介</a><br/>
+<a href="https://dev.mysql.com/doc/refman/5.7/en/innodb-locks-set.html">Locks Set by Different SQL Statements in InnoDB</a></p>
+</blockquote>
+
+<h4 id="toc_1">区间锁（LOCK_GAP）</h4>
+
+<p>锁住一段范围，不锁记录本身，通常表示两个索引记录之间，或者索引上的第一条记录之前，或者最后一条记录之后的锁。一般在 RR 隔离级别下会使用。</p>
+
+<h5 id="toc_2">Next-Key 锁（LOCK_ORDINARY）</h5>
+
+<p>其实就是锁住 待插入记录本身 + 记录之前的 GAP，Next-Key 锁用于解决 RR 隔离级别下的幻读问题。</p>
+
+<p>通常对于 UPDATE 或 DELETE 或 SELECT … FOR UPDATE 或 SELECT … IN SHARE MODE 操作：</p>
+
+<ul>
+<li>查询条件为唯一索引且是唯一等值查询时，只对记录本身加锁 </li>
+<li>非唯一条件查询，或者查询会扫描到多条记录，加 Next-Key 锁</li>
+</ul>
+
+<span id="more"></span><!-- more -->
+
+<h4 id="toc_3">共享锁 (LOCK_S)</h4>
+
+<p>允许多个事务读取，阻止其他事务获取相同数据集的排他锁。</p>
+
+<p>通常 INSERT 操作是不加锁的，但如果在插入或更新记录时，检查到 duplicate key（或者有一个被标记删除的 duplicate key），对于普通的 INSERT/UPDATE，会加 LOCK_S 锁，而对于类似 REPLACE INTO 或者 INSERT … ON DUPLICATE 这样的 SQL 加的是 X 锁。</p>
+
+<h4 id="toc_4">排它锁 (LOCK_X)</h4>
+
+<p>允许获得排他锁的事务更新数据，阻止其他事务取得相同数据集的共享读锁和排他写锁。</p>
+
+<p>通常对于 UPDATE 或 DELETE 或类似 SELECT … FOR UPDATE 操作，都会对记录加排他锁</p>
+
+<h4 id="toc_5">插入意向锁（LOCK_INSERT_INTENTION）</h4>
+
+<p>插入意向锁是 GAP 锁的一种，如果有多个 Session 插入同一个 GAP 时，他们无需互相等待，例如当前索引上有记录 4 和 8，两个并发 Session 同时插入记录 6，7。他们会分别为 (4,8) 加上 GAP 锁，但相互之间并不冲突（因为插入的记录不冲突）。</p>
+
+<p>会去检查当前插入位置的下一条记录上是否存在锁对象，这里的下一条记录不是指的物理连续，而是按照逻辑顺序的下一条记录。如果下一条记录上存在锁对象，就需要判断该锁对象是否锁住了 GAP。如果 GAP 被锁住了，并判定和插入意向 GAP 锁冲突，当前操作就需要等待，加的锁类型为 LOCK_X | LOCK_GAP | LOCK_INSERT_INTENTION。</p>
+
+<blockquote>
+<p>对于 GAP 类型且申请的不是插入意向锁时，无需等待任何锁，这是因为不同 Session 对于相同 GAP 可能申请不同类型的锁，而 GAP 锁本身设计为不互相冲突；<br/>
+任何锁请求都无需等待插入意向锁。</p>
+</blockquote>
+
+<h2 id="toc_6">死锁场景</h2>
+
+<ol>
+<li><p>并发插入导致的死锁</p>
+<blockquote>
+<p><code>create table t1 (a int primary key);</code><br/>
+三个会话执行 <code>insert into t1(a) values (2);</code></p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Session1</th>
+<th>Session2</th>
+<th>Session3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>insert，获取 X 锁</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>insert，等待获取 S 锁</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>insert，等待获取 S 锁</td>
+</tr>
+<tr>
+<td>Rollback，释放 X 锁</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>获取 S 锁</td>
+<td>获得 S 锁</td>
+</tr>
+<tr>
+<td></td>
+<td>申请插入意向 X 锁，等待 Session 3</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>申请插入意向 X 锁，等待 Session 2</td>
+</tr>
+</tbody>
+</table>
+<p>检测到有 duplicate key 所以加 S 锁。回滚后，同时持有 S 锁，但又都无法获得 插入意向 X 锁。</p></li>
+<li><p>GAP 锁导致的死锁</p>
+<pre><code class="language-sql">create table t1 (a int primary key ,b int);
+insert into t1 values (2,2),(6,6),(10,10);
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Session1</th>
+<th>Session2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>delete from t where id = 3; 获得 2-5 的 GAP 锁</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>delete from t where id = 4; 获得 2-5 的 GAP 锁</td>
+</tr>
+<tr>
+<td>insert into t values (3, 0); 意向插入锁等待 Session2 释放 GAP 锁</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>insert into t values (4, 0); 意向插入锁等待 Session2 释放 GAP 锁</td>
+</tr>
+</tbody>
+</table></li>
+</ol>
+
+<h2 id="toc_7">相关查询</h2>
+
+<ol>
+<li><p>查看innodb状态(包含最近的死锁日志)</p>
+<pre><code class="language-sql">show engine innodb status;
+</code></pre></li>
+<li><p>查看事务锁等待状态情况</p>
+<pre><code class="language-sql">select * from information_schema.innodb_locks;
+select * from information_schema.innodb_lock_waits;<br/>
+select * from information_schema.innodb_trx;
+</code></pre></li>
+</ol>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[MySQL、SQL Server 和 Oracle 触发器的创建]]></title>
+    <link href="http://blog.tangjiujun.com/db-trigger-create.html"/>
+    <updated>2016-10-18T07:48:33+08:00</updated>
+    <id>http://blog.tangjiujun.com/db-trigger-create.html</id>
+    <content type="html"><![CDATA[
+<blockquote>
+<p>场景：当 users 表在 insert，update，delete 时，在 users_log 表中记录变更的 id</p>
+</blockquote>
+
+<h3 id="toc_0">MySQL</h3>
+
+<p>触发时机：BEFORE，AFTER<br/>
+触发事件：INSERT，UPDATE，DELETE<br/>
+NEW 和 OLD 关键字：</p>
+
+<p>| action |      NEW       |      OLD       |<br/>
+  |--------|----------------|----------------|<br/>
+  | insert | 插入的新数据   | 无             |<br/>
+  | update | 修改为的新数据 | 被修改的原数据 |<br/>
+  | delete | 无             | 被删除的原数据 |</p>
+
+<pre><code class="language-sql">DELIMITER $
+CREATE TRIGGER insert_user AFTER INSERT
+ON users FOR EACH ROW 
+BEGIN
+    INSERT INTO users_log(user_id, action) VALUES(NEW.id, &#39;insert&#39;);
+END$
+DELIMITER ;
+</code></pre>
+
+<span id="more"></span><!-- more -->
+
+<h3 id="toc_1">SQL Server</h3>
+
+<p>触发时机：INSTEAD OF（之前），FOR（之后）<br/>
+触发事件：INSERT，UPDATE，DELETE<br/>
+INSERTED 和 DELETED 逻辑（概念）表：作用相当于 MySQL 中的 NEW 和 OLD 关键字，不过 MySQL 的代表一条记录，而 SQL Server 的代表所有记录的临时表</p>
+
+<pre><code class="language-sql">CREATE TRIGGER insert_user ON users FOR INSERT AS
+BEGIN
+    DECLARE @id INT
+    SELECT @id = MIN(id) FROM INSERTED WHILE @id IS NOT NULL
+    BEGIN
+        INSERT INTO users_log(user_id, action) VALUES (@id, &#39;insert&#39;)
+        SELECT @id = MIN(id) FROM INSERTED WHERE id &gt; @id
+    END
+END
+</code></pre>
+
+<h3 id="toc_2">Oracle</h3>
+
+<p>触发时机：BEFORE，AFTER<br/>
+触发事件：INSERT，UPDATE，DELETE<br/>
+:NEW 和 :OLD 关键字：作用相当于 MySQL 中的 NEW 和 OLD 关键字</p>
+
+<pre><code class="language-sql">CREATE OR REPLACE TRIGGER insert_user AFTER INSERT 
+ON SCOTT.&quot;users&quot; FOR EACH ROW
+BEGIN
+    insert into SCOTT.&quot;users_log&quot;(&quot;user_id&quot;, &quot;action&quot;) VALUES (:NEW.&quot;id&quot;, &#39;insert&#39;);
+END;
+/
+</code></pre>
+
+<p><em>Oracle 不使用 <code>dbms_lock.sleep</code> 实现暂停的方式</em>：</p>
+
+<pre><code class="language-sql">CREATE OR REPLACE PROCEDURE SLEEP (P_MILLI_SECONDS IN NUMBER) 
+AS LANGUAGE JAVA NAME &#39;java.lang.Thread.sleep(long)&#39;;
+
+BEGIN
+    INSERT INTO SCOTT.TJJ (&quot;id&quot;, &quot;name&quot;) VALUES (1, &#39;a&#39;);
+    SLEEP(10 * 1000);
+END;
+</code></pre>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[代理模式及 Java 实现动态代理]]></title>
+    <link href="http://blog.tangjiujun.com/java-dynamic-proxy.html"/>
+    <updated>2016-10-18T07:51:12+08:00</updated>
+    <id>http://blog.tangjiujun.com/java-dynamic-proxy.html</id>
+    <content type="html"><![CDATA[
+<h3 id="toc_0">前提条件</h3>
+
+<pre><code class="language-java">public interface Animal {
+    void say();
+
+    void run(String addr);
+}
+
+public class Dog implements Animal {
+    @Override
+    public void say() {
+        System.out.println(&quot;汪汪汪&quot;);
+    }
+
+    @Override
+    public void run(String addr) {
+        say();
+        System.out.println(&quot;狗在&quot; + addr + &quot;跑&quot;);
+    }
+}
+</code></pre>
+
+<span id="more"></span><!-- more -->
+
+<h3 id="toc_1">代理模式示例</h3>
+
+<pre><code class="language-java">public class DogProxy implements Animal {
+    private Dog dog;
+
+    public DogProxy(Dog dog) {
+        this.dog = dog;
+    }
+
+    @Override
+    public void say() {
+
+    }
+
+    @Override
+    public void run(String addr) {
+        System.out.println(&quot;跑之前&quot;);
+        try {
+            dog.run(addr);
+        } finally {
+            System.out.println(&quot;跑之后&quot;);
+        }
+    }
+}
+
+// 调用
+new DogProxy(new Dog()).run(&quot;路上&quot;);
+</code></pre>
+
+<h3 id="toc_2">Java 动态代理示例</h3>
+
+<pre><code class="language-java">public class InvokeHandler implements InvocationHandler {
+    private Object object;
+
+    public InvokeHandler(Object object) {
+        this.object = object;
+    }
+
+    /**
+     * @param proxy 相当于代理类的 this
+     */
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        System.out.println(&quot;调用之前&quot;);
+        try {
+            return method.invoke(object, args);
+        } finally {
+            System.out.println(&quot;调用之后&quot;);
+        }
+    }
+}
+
+// 调用
+InvokeHandler handle = new InvokeHandler(new Dog());
+Animal animal = (Animal) Proxy.newProxyInstance(
+                this.getClass().getClassLoader(), Dog.class.getInterfaces(), handle);
+animal.run(&quot;路上&quot;);
+</code></pre>
+
+<h3 id="toc_3">Java 动态代理类特性</h3>
+
+<ol>
+<li>类名以 <code>$Proxy</code> 开头</li>
+<li>代理类继承自 java.lang.reflect.Proxy</li>
+<li>调用 Proxy.isProxyClass 方法返回 true</li>
+<li>代理类严格按顺序实现所有的接口（当实现的几个接口中有重复的方法时，代理类总是从最前面的接口获取方法对象，并分派给调用处理器）</li>
+<li>在代理类实例上调用其代理的接口中所声明的方法时，最终都会由调用处理器的 invoke 方法执行；此外 java.lang.Object 中的 public，非 final 方法也会分派给调用处理器 invoke 方法执行，如：hashCode，equals，toString</li>
+</ol>
+
+<h3 id="toc_4">Java 动态代理的限制</h3>
+
+<ol>
+<li>只能代理接口，因此只能代理 public 方法</li>
+<li>代理类的内部方法间的调用时，代理不生效</li>
+</ol>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[关于 MySQL 中 InnoDB 的 MVCC 的一些理解]]></title>
+    <link href="http://blog.tangjiujun.com/mysql-innodb-mvcc.html"/>
+    <updated>2016-10-18T07:48:33+08:00</updated>
+    <id>http://blog.tangjiujun.com/mysql-innodb-mvcc.html</id>
+    <content type="html"><![CDATA[
+<p>在 MySQL 中 InnoDB 的 MVCC 实现机制是给每行记录增加三个隐藏字段：</p>
+
+<ul>
+<li>6 字节的 DB_TRX_ID，用于记录最近一次插入或更新的事务标示。删除也是一种更新，用一个特殊的字节表示该行已删除。</li>
+<li>7 字节的 DB_ROLL_PTR，回滚指针，指向 undo log 记录。</li>
+<li>6 字节的 DB_ROW_ID，自增长的 row ID。<br/>
+参考：<a href="http://dev.mysql.com/doc/refman/5.7/en/innodb-multi-versioning.html">InnoDB Multi-Versioning</a></li>
+</ul>
+
+<span id="more"></span><!-- more -->
+
+<h3 id="toc_0">MySQL 事务中的两种读</h3>
+
+<ul>
+<li><p>快照读 (Snapshot Read)：<br/>
+猜测：在事务中进行 select 时，事务会记录当前正在读取的表的最大 DB_ROW_ID，以后就会读取不大于该 DB_RWO_ID 的记录。</p>
+<pre><code class="language-text">select * from table ...; 不加锁
+</code></pre></li>
+<li><p>当前读 (Current Read)：</p>
+<pre><code class="language-text">select * from table ... lock in share mode; 加共享锁
+select * from table ... for update; 加排它锁<br/>
+insert ...<br/>
+update ...<br/>
+delete ...
+</code></pre></li>
+</ul>
+
+<p><strong>快照读读取出来的可能时历史数据，而 update 和 delete 需要获取实时数据。<br/>
+虽然说事务的隔离级别定义的是读数据的要求，而实际上也可以说是定义了写（当前读）数据的要求。<br/>
+在 RR 事务级别是存在幻读问题的，虽然快照读可以解决。但是在当前读中，MySQL 是如何解决的？为了解决当前读中的幻读问题，MySQL 使用了 Next-Key 锁。</strong></p>
+
+<h3 id="toc_1">不可重复读与幻读的区别</h3>
+
+<p>在使用行锁机制的前提下（当前读），可重复读在读取时对读到的行加锁，这样就可以防止其它事务修改或删除数据；但是无法阻止其它事务新增数据，当事务再次执行相同的 SQL 读取数据时，确发现多出一条，这就是幻读。</p>
+
+<h3 id="toc_2">事务的四种隔离级别</h3>
+
+<p><strong>虽然说事务的隔离级别定义的是读数据的要求，而实际上也可以说是定义了写（当前读）数据的要求。</strong> </p>
+
+<ul>
+<li>未提交读 (Read Uncommitted): <br/>
+允许一个事务读取到其它事务中未提交的数据，会出现脏读、不可重复读、幻读。</li>
+<li>已提交读 (Read Committed):<br/>
+只能读取到已提交的数据，会出现不可重复读、幻读。</li>
+<li>可重复读 (Repeated Read):<br/>
+在同一事务内相同条件下多次查询结果一致，会出现幻读。InnoDB 默认事务隔离级别。</li>
+<li>未提交读 (Serilizable):<br/>
+事务串行化执行。</li>
+</ul>
+
+<h3 id="toc_3">事务执行 update 流程</h3>
+
+<ul>
+<li>用排它锁锁定满足条件的行</li>
+<li>记录 redo log</li>
+<li>把该行修改前的值复制到 undo log</li>
+<li>修改当前行的值，填写事务编号，使回滚指针指向 undo log 中修改前的行</li>
+<li>当事务发生异常，则根据回滚指针从 undo log 中找出事务修改前的版本，并恢复。</li>
+</ul>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Spring-AMQP 的使用记录]]></title>
+    <link href="http://blog.tangjiujun.com/spring-amqp-usage.html"/>
+    <updated>2016-10-18T07:51:12+08:00</updated>
+    <id>http://blog.tangjiujun.com/spring-amqp-usage.html</id>
+    <content type="html"><![CDATA[
+<h3 id="toc_0">Spring-AMQP 特性</h3>
+
+<ul>
+<li>Listener container 使用 POJO 异步处理消息</li>
+<li>提供一个高度抽象的 template（RabbitTemplate）发送和接收消息</li>
+<li>使用 RabbitAdmin 来自动声明队列、Exchange 和 Binding</li>
+</ul>
+
+<h3 id="toc_1">队列、Exchange 和 Binding 的设置</h3>
+
+<ul>
+<li><p>Spring way<br/>
+使用 <code>spring-boot-starter-amqp</code> 会自动配置 <code>ConnectionFactory</code>、<code>RabbitTemplate</code> 和 <code>AmqpAdmin</code> 三个 Bean。</p>
+<pre><code class="language-java">@Configuration
+public class RabbitConfiguration {<br/>
+  @Bean<br/>
+  public DirectExchange exchange() {<br/>
+      return new DirectExchange(&quot;infrastructure.direct&quot;);<br/>
+  }<br/>
+  @Bean<br/>
+  public Queue queue(){<br/>
+      return new Queue(&quot;queueName&quot;);<br/>
+  }<br/>
+  @Bean<br/>
+  public Binding binding(){<br/>
+      return BindingBuilder.bind(queue()).to(exchange()).with(&quot;routeKey&quot;);<br/>
+  }<br/>
+}
+</code></pre></li>
+<li><p>Just java</p>
+<pre><code class="language-java">ConnectionFactory connectionFactory = new CachingConnectionFactory();
+RabbitAdmin amqpAdmin = new RabbitAdmin(connectionFactory);<br/>
+Queue queue = new Queue(&quot;quueuName&quot;);<br/>
+DirectExchange exchange = new DirectExchange(&quot;exchangeName&quot;);<br/>
+amqpAdmin.declareQueue(queue);<br/>
+amqpAdmin.declareExchange(exchange);<br/>
+amqpAdmin.declareBinding(BindingBuilder.bind(queue).to(exchange).with(&quot;routeKey&quot;));
+</code></pre></li>
+</ul>
+
+<span id="more"></span><!-- more -->
+
+<h3 id="toc_2">生产消息</h3>
+
+<pre><code class="language-java">@Autowired
+private RabbitTemplate rabbitTemplate;
+
+// 三种方式发送消息
+rabbitTemplate.send();
+rabbitTemplate.sendAndReceive(); // 用于 RPC 模式的消息发送并等待响应
+rabbitTemplate.convertAndSend(); // 将 Java 对象转换成 Message 并发送
+</code></pre>
+
+<h3 id="toc_3">消费消息</h3>
+
+<p>在 Listener container 中设置一个简单的 POJO 对象来异步处理消息</p>
+
+<ul>
+<li><p>消息 Listener 实现</p>
+<pre><code class="language-java">// 三种方式
+public class MessageHandler implements MessageListener {<br/>
+  @Override<br/>
+  public void onMessage(Message message) {<br/>
+  }<br/>
+}<br/>
+public class MessageHandler implements ChannelAwareMessageListener {<br/>
+  @Override<br/>
+  public void onMessage(Message message, Channel channel) throws Exception {<br/>
+  }<br/>
+}<br/>
+public class MessageHandler {<br/>
+  public void handleMessage(Message message);<br/>
+}
+</code></pre></li>
+<li><p>设置 MessageListenerContainer</p>
+<pre><code class="language-java">@Autowired
+private ConnectionFactory connectionFactory;<br/>
+SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();<br/>
+container.setConnectionFactory(connectionFactory);<br/>
+container.setQueueNames(&quot;queueName&quot;);<br/>
+container.setMessageListener(new MessageListenerAdapter(new MessageHandler()));<br/>
+container.setXXX(); 设置队列、listener 等<br/>
+container.start();<br/>
+container.addQueueNames(); // 动态添加队列
+</code></pre></li>
+</ul>
+
+<h3 id="toc_4">处理消息异常</h3>
+
+<p>默认情况下，listener 抛出的所有异常都将包装成 <code>ListenerExecutionFailedException</code> 异常，然后将消息重新放入队列。<br/>
+因为 <code>MessageListenerContainer</code> 默认设置 <code>ErrorHandler</code> 为 <code>ConditionalRejectingErrorHandler</code>，<code>ConditionalRejectingErrorHandler</code> 的默认策略是 <code>DefaultExceptionStrategy</code>，当 <code>DefaultExceptionStrategy</code> 的 <code>isFatal</code> 返回 true 时，该消息将被忽略。 <br/>
+默认发生 <code>MessageConversionException</code> 异常的消息将被丢弃。我们也可以根据情况自己实现 <code>ErrorHandler</code> 来处理消息异常。</p>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Spring Boot Integration 测试]]></title>
+    <link href="http://blog.tangjiujun.com/spring-boot-integration-test.html"/>
+    <updated>2016-10-18T07:51:12+08:00</updated>
+    <id>http://blog.tangjiujun.com/spring-boot-integration-test.html</id>
+    <content type="html"><![CDATA[
+<ol>
+<li><p>新建一个测试配置类 TestApplication</p>
+<pre><code class="language-java">@Configuration
+@EnableAutoConfiguration<br/>
+@ComponentScan(<br/>
+      excludeFilters = @ComponentScan.Filter(value = {<br/>
+              Application.class,<br/>
+              ApplicationChecker.class<br/>
+      }, type = FilterType.ASSIGNABLE_TYPE))<br/>
+public class TestApplication {<br/>
+  // 配置测试使用内存数据库<br/>
+  @Bean<br/>
+  public DataSource dataSource() {<br/>
+      return new EmbeddedDatabaseBuilder().setType(EmbeddedDatabaseType.H2).build();<br/>
+  }<br/>
+}
+</code></pre></li>
+</ol>
+
+<span id="more"></span><!-- more -->
+
+<ol>
+<li><p>新建一个测试公共类 CommonBeanIntegrationTest</p>
+<pre><code class="language-java">@RunWith(SpringJUnit4ClassRunner.class)
+@SpringApplicationConfiguration(classes = TestApplication.class)<br/>
+// 重新加载 Spring 上下文<br/>
+// @DirtiesContext(classMode = ClassMode.AFTER_EACH_TEST_METHOD)<br/>
+public abstract class CommonBeanIntegrationTest {<br/>
+  @After<br/>
+  public void emptyDatabases() {<br/>
+      // 清空数据库，运行速度相对于每次重新加载 Spring 上下文快很多<br/>
+  }<br/>
+}
+</code></pre></li>
+<li><p>正式开始写测试</p>
+<ul>
+<li>常规测试类结构</li>
+</ul>
+<pre><code class="language-java">public class UserTest extends CommonBeanIntegrationTest {
+    @Autowired<br/>
+    private UserAccessor userAccessor; // 准备测试的 Bean<br/>
+    @Autowired<br/>
+    private UserRepository userRepository; // 测试中需要用到的辅助 Bean<br/>
+    @Before<br/>
+    public void setUp() {<br/>
+        // 每个测试开始前的操作<br/>
+    }<br/>
+    @Test<br/>
+    public void should_save_user_with_username() {<br/>
+        // given<br/>
+        String username = &quot;foo&quot;;<br/>
+        // when<br/>
+        userAccessor.save(username);<br/>
+        // then<br/>
+        assertThat(userRepository.findOne(1).getUsername, is(username));<br/>
+    }<br/>
+    @After<br/>
+    public void tearDown() {<br/>
+        // 每个测试执行后的操作<br/>
+    }<br/>
+}
+</code></pre>
+<ul>
+<li>使用 Mock 时测试类结构</li>
+</ul>
+<pre><code class="language-java">@RunWith(MockitoJUnitRunner.class)
+public class HttpClientTest {<br/>
+    @Mock<br/>
+    private ServerProperties serverProperties;<br/>
+    @InjectMocks // 把 @Mock 注解的对象注入到 httpClient 中<br/>
+    private HttpClient httpClient;<br/>
+    @Test<br/>
+    public void should_get_correct_port(){<br/>
+        when(serverProperties.getPort()).thenReturn(8080);<br/>
+        assertThat(httpClient.get(ApiUrl.list_node).getPort(), is(8080));<br/>
+    }<br/>
+}
+</code></pre>
+<ul>
+<li>混合使用前两种</li>
+</ul>
+<pre><code class="language-java">public class UserTest extends CommonBeanIntegrationTest {
+    @Autowired<br/>
+    private UserRepository userRepository;<br/>
+    @Mock<br/>
+    private HttpClient httpClient;<br/>
+    @Autowired<br/>
+    @InjectMocks<br/>
+    private UserAccessor userAccessor; // 准备测试的 Bean<br/>
+    @Before<br/>
+    public void setUp() {<br/>
+        MockitoAnnotations.initMocks(this); // 初始化并注入 @Mock 注解的对象<br/>
+        // 强制将 Mock 的 httpClient 对象注入 userAccessor 中<br/>
+        // ReflectionTestUtils.setField(userAccessor, &quot;httpClient&quot;, httpClient);<br/>
+    }<br/>
+    @Test<br/>
+    public void test_something(){<br/>
+        // Test Code<br/>
+    }<br/>
+}
+</code></pre>
+<p>同时在需要测试的 Bean 上使用 @Autowired 和 @InjectMocks 注解后，可以达到只 Mock 需要 Mock 的对象，而其它对象依然是注入的真实对象的效果。<br/>
+但是有时候可能会出现我们 Mock 的对象还是注入的真实对象的情况，此时可以使用 Spring Boot 提供的 ReflectionTestUtils 在 @Before 中强制手动设置需要 Mock 的对象的值。</p></li>
+</ol>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Spring-data-redis 的使用记录]]></title>
+    <link href="http://blog.tangjiujun.com/spring-data-redis-usage.html"/>
+    <updated>2016-10-18T07:51:12+08:00</updated>
+    <id>http://blog.tangjiujun.com/spring-data-redis-usage.html</id>
+    <content type="html"><![CDATA[
+<h3 id="toc_0">开始向导</h3>
+
+<p>添加 dependency <code>spring-boot-starter-redis</code>，它默认使用 <code>jedis</code>（还支持 JRedis，SRP 和 Lettuce）<br/>
+一个简单的 Hash 示例：</p>
+
+<pre><code class="language-java">@SpringBootApplication
+public class RedisDemo implements CommandLineRunner {
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    public static void main(String[] args) {
+        SpringApplication.run(RedisDemo.class).close();
+    }
+
+    public void run(String... args) throws Exception {
+        BoundHashOperations&lt;String, String, String&gt; ops = stringRedisTemplate.boundHashOps(&quot;com.foo&quot;);
+        ops.put(&quot;name&quot;, &quot;bar&quot;);
+        ops.put(&quot;sex&quot;, &quot;man&quot;);
+        System.out.println(ops.entries()); // 打印结果：{name=bar, sex=man}
+    }
+}
+</code></pre>
+
+<span id="more"></span><!-- more -->
+
+<h3 id="toc_1">RedisTemplate</h3>
+
+<p>RedisConnection 负责提供底层的数据操作；而 RedisTemplate 提供对 Redis 数据操作统一的抽象实现，并负责序列化存取的数据以及和 Redis 的连接管理。<br/><br/>
+StringRedisTemplate 继承自 RedisTemplate，用于操作基于字符串的存取操作。</p>
+
+<p>针对 Redis 不同的存取类型，RedisTemplate 提供了不同的操作视图。</p>
+
+<pre><code class="language-text">ValueOperations
+ListOperations
+SetOperations
+ZSetOperations
+HashOperations
+HyperLogLogOperations
+</code></pre>
+
+<p>spring-data-redis 同时提供了绑定 key 的操作视图，省去每次都需要填写 key 的麻烦。</p>
+
+<pre><code class="language-text">BoundValueOperations
+BoundListOperations
+BoundSetOperations
+BoundZSetOperations
+BoundHashOperations
+</code></pre>
+
+<h3 id="toc_2">RedisSerializer</h3>
+
+<p>RedisTemplate 默认采用 JdkSerializationRedisSerializer 序列化，提供的序列化类有：</p>
+
+<ul>
+<li>JdkSerializationRedisSerializer</li>
+<li>StringRedisSerializer</li>
+<li>OxmSerializer</li>
+<li>JacksonJsonRedisSerializer</li>
+<li>Jackson2JsonRedisSerializer</li>
+</ul>
+
+<p>我们也可以自己实现 RedisSerializer 接口的 serialize 和 deserialize 方法，来实现对自定义对象的序列化和反序列化存取。</p>
+
+<pre><code class="language-java">@SpringBootApplication
+public class RedisDemo implements CommandLineRunner {
+    @Autowired
+    private RedisTemplate redisTemplate;
+
+    public static void main(String[] args) {
+        SpringApplication.run(RedisDemo.class).close();
+    }
+
+    public void run(String... args) throws Exception {
+        redisTemplate.setValueSerializer(new DomainSerializer());
+        BoundValueOperations&lt;String, Person&gt; ops = redisTemplate.boundValueOps(&quot;foo.diy&quot;);
+        ops.getAndSet(new Person(&quot;foo&quot;));
+        System.out.println(ops.get());
+    }
+}
+
+class Person {
+    private final String name;
+
+    public Person(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    @Override
+    public String toString() {
+        return &quot;Domain{&quot; +
+                &quot;name=&#39;&quot; + name + &#39;\&#39;&#39; +
+                &#39;}&#39;;
+    }
+}
+
+class DomainSerializer implements RedisSerializer&lt;Person&gt; {
+    @Override
+    public byte[] serialize(Person person) throws SerializationException {
+        return person.getName().getBytes();
+    }
+
+    @Override
+    public Person deserialize(byte[] bytes) throws SerializationException {
+        return new Person(new String(bytes));
+    }
+}
+</code></pre>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Spring Data JPA 一对一关联]]></title>
+    <link href="http://blog.tangjiujun.com/spring-data-jpa-one-to-one.html"/>
+    <updated>2016-10-18T07:51:12+08:00</updated>
+    <id>http://blog.tangjiujun.com/spring-data-jpa-one-to-one.html</id>
+    <content type="html"><![CDATA[
+<h3 id="toc_0">使用注意</h3>
+
+<pre><code class="language-java">User user = new User();
+user.setUsername(&quot;foo&quot;);
+Email email = new Email();
+email.setUser(user);  // 必须显示设置 user，否则关联字段值会为空
+email.setEmail(&quot;foo@bar.com&quot;);
+user.setEmail(email); 
+userRepository.save(user);
+</code></pre>
+
+<span id="more"></span><!-- more -->
+
+<h3 id="toc_1">通过 @Id 注解指定的字段进行关联</h3>
+
+<pre><code class="language-java">public class User {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    @Column
+    private String username;
+    @OneToOne(cascade = CascadeType.ALL, mappedBy = &quot;user&quot;)
+    private Email email;
+}
+public class Email {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    @OneToOne
+    private User user; // 默认表字段为：user_id，字段对应规则和一对多一样
+    @Column
+    private String email;
+}
+</code></pre>
+
+<h3 id="toc_2">通过手动指定两边的字段名称</h3>
+
+<pre><code class="language-java">public class User {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    @Column
+    private String username;
+    @OneToOne(cascade = CascadeType.ALL, mappedBy = &quot;user&quot;)
+    private Email email;
+}
+public class Email {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    @OneToOne
+    @JoinColumn(name = &quot;user_name&quot;, referencedColumnName = &quot;username&quot;)
+    private User user;  // Email 实体对应的表字段为：user_name
+    @Column
+    private String email;
+}
+</code></pre>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Spring Data JPA 一对多关联]]></title>
+    <link href="http://blog.tangjiujun.com/spring-data-jpa-one-to-many.html"/>
+    <updated>2016-10-18T07:51:12+08:00</updated>
+    <id>http://blog.tangjiujun.com/spring-data-jpa-one-to-many.html</id>
+    <content type="html"><![CDATA[
+<h2 id="toc_0">一对多单向关联</h2>
+
+<h3 id="toc_1">通过有 @Id 注解的字段进行关联</h3>
+
+<pre><code class="language-java">public class User {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    @Column
+    private String username;
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = &quot;user_id&quot;)
+    private Set&lt;Email&gt; emails = new HashSet&lt;&gt;();
+}
+public class Email {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    /* 默认关联字段名为：驼峰类名转为下划线方式 ＋ &quot;_&quot; + @Id 注解的字段名。
+    例如 User 的 username 字段有 @Id 注解，则 Email 表关联的字段就默认为 user_username */
+    @Column(name = &quot;user_id&quot;)
+    private Integer userId; 
+    @Column
+    private String email;
+}
+</code></pre>
+
+<span id="more"></span><!-- more -->
+
+<h3 id="toc_2">通过手动指定两边的字段名称</h3>
+
+<pre><code class="language-java">public class User implements Serializable {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    @Column
+    private String username;
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = &quot;user_name&quot;, referencedColumnName = &quot;username&quot;)
+    private Set&lt;Email&gt; emails = new HashSet&lt;&gt;();
+}
+public class Email {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    @Column(name = &quot;user_name&quot;)
+    private Integer userName;
+    @Column
+    private String email;
+}
+</code></pre>
+
+<h2 id="toc_3">一对多双向关联</h2>
+
+<h3 id="toc_4">通过 @Id 注解指定的字段进行关联</h3>
+
+<pre><code class="language-java">public class User {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    @Column
+    private String username;
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = &quot;user&quot;)
+    private Set&lt;Email&gt; emails = new HashSet&lt;&gt;();
+}
+public class Email {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    /* 默认关联字段名为：驼峰类名转为下划线方式 ＋ &quot;_&quot; + @Id 注解。的字段名
+    例如 User 的 username 字段有 @Id 注解，则 Email 表关联的字段就默认为 user_username */
+    @ManyToOne
+    private User user;  // 默认表字段为：user_id
+    @Column
+    private String email;
+}
+</code></pre>
+
+<h3 id="toc_5">通过手动指定两边的字段名称</h3>
+
+<pre><code class="language-java">public class User implements Serializable {
+    @Id
+    @Column
+    private String username;
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = &quot;user&quot;)
+    private Set&lt;Email&gt; emails = new HashSet&lt;&gt;();
+}
+public class Email {
+    @Id
+    @GeneratedValue
+    private Integer id;
+    @ManyToOne
+    @JoinColumn(name = &quot;user_name&quot;, referencedColumnName = &quot;username&quot;)
+    private User user; // Email 实体对应的表字段为：user_name
+    @Column
+    private String email;
+}
+</code></pre>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[使用 Java 7 的 WatchService 监控目录]]></title>
+    <link href="http://blog.tangjiujun.com/java-file-watcher.html"/>
+    <updated>2016-10-18T07:51:12+08:00</updated>
+    <id>http://blog.tangjiujun.com/java-file-watcher.html</id>
+    <content type="html"><![CDATA[
+<blockquote>
+<p>在 Java 7 新增了 WatchService，它可以用来监控指定目录下的文件改动</p>
+</blockquote>
+
+<span id="more"></span><!-- more -->
+
+<h3 id="toc_0">监控示例代码</h3>
+
+<pre><code class="language-java">import java.io.IOException;
+import java.nio.file.*;
+
+public class DirectoryWatcher implements Runnable {
+    private final Path path; // 监控目录
+    private final WatchService watchService;
+
+    public DirectoryWatcher(Path path) {
+        this.path = path;
+        try {
+            this.watchService = FileSystems.getDefault().newWatchService();
+        } catch (IOException e) {
+            throw new RuntimeException(&quot;初始化 watchService 出错&quot;, e);
+        }
+    }
+
+
+    @Override
+    public void run() {
+        try {
+            path.register(watchService, StandardWatchEventKinds.ENTRY_CREATE);
+        } catch (IOException e) {
+            throw new RuntimeException(&quot;注册监控事件出错&quot;, e);
+        }
+
+        while (!Thread.interrupted()) {
+            if (!watch()) {
+                break;
+            }
+        }
+
+        try {
+            watchService.close();
+        } catch (IOException e) {
+            throw new RuntimeException(&quot;关闭 watchService 出错&quot;, e);
+        }
+    }
+
+    private boolean watch() {
+        WatchKey signal;
+        try {
+            // 等待监控信号
+            signal = watchService.take();
+        } catch (InterruptedException e) {
+            return false;
+        }
+
+        // 处理监控事件
+        for (WatchEvent&lt;?&gt; event : signal.pollEvents()) {
+            WatchEvent.Kind&lt;?&gt; kind = event.kind();
+            // 处理 OVERFLOW 事件
+            if (StandardWatchEventKinds.OVERFLOW.equals(kind)) {
+                continue;
+            }
+            System.out.println(&quot;事件：&quot; + event.kind() + &quot;，&quot; + &quot;文件名：&quot; + event.context());
+        }
+
+        // 重置并继续监控
+        return signal.reset();
+    }
+
+    public static void main(String[] args) {
+        new Thread(new DirectoryWatcher(Paths.get(&quot;/for/bar&quot;))).run();
+    }
+}
+</code></pre>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Spring Boot 的配置加载顺序]]></title>
+    <link href="http://blog.tangjiujun.com/spring-boot-load-config.html"/>
+    <updated>2016-10-18T07:51:12+08:00</updated>
+    <id>http://blog.tangjiujun.com/spring-boot-load-config.html</id>
+    <content type="html"><![CDATA[
+<h3 id="toc_0">配置的加载</h3>
+
+<p>Spring Boot 可以从 properties 文件、YAML 文件、环境变量和命令行参数获取配置。默认 <code>SpringApplication</code> 将从如下位置加载 <code>application.properties</code> 或 <code>application.yml</code> 文件作为配置。</p>
+
+<ol>
+<li><code>java -jar project.jar --spring.config.location=/path/to/application.yml</code></li>
+<li>......</li>
+<li>A <code>/config</code> subdir of the current directory（<code>application.properties</code> or <code>application.yml</code>）</li>
+<li>The current directory（<code>application.properties</code> or <code>application.yml</code>）</li>
+<li>A classpath <code>/config</code> package（<code>application.properties</code> or <code>application.yml</code>）</li>
+<li>The classpath root（<code>application.properties</code> or <code>application.yml</code>）</li>
+<li><code>@PropertySource</code> 或者 <code>@PropertySources</code> annotations on your <code>@Configuration</code> classes</li>
+<li>Default properties (specified using <code>SpringApplication.setDefaultProperties</code>)</li>
+</ol>
+
+<p>根据配置加载的顺序，前面的配置将会覆盖后面的配置项。<a href="http://docs.spring.io/spring-boot/docs/current/reference/html/common-application-properties.html">常见的配置</a></p>
+
+<span id="more"></span><!-- more -->
+
+<h3 id="toc_1">配置的使用</h3>
+
+<ol>
+<li><p>使用 <code>@Value(&quot;${property}&quot;)</code> 注解单个配置项的值</p>
+<pre><code class="language-java">@Value(&quot;${user.name}&quot;)
+private Strin username;
+</code></pre></li>
+<li><p>使用 <code>@ConfigurationProperties(prefix=&quot;user&quot;)</code> 注解类型安全的多个配置项</p>
+<pre><code class="language-java">@Component
+@ConfigurationProperties(prefix=&quot;user&quot;)<br/>
+public class UserSettings {<br/>
+  private String name;<br/>
+  private int age;<br/>
+  // ... getters and setters<br/>
+}
+</code></pre></li>
+</ol>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[RegExp 正则表达式]]></title>
+    <link href="http://blog.tangjiujun.com/regexp.html"/>
+    <updated>2016-10-18T07:48:33+08:00</updated>
+    <id>http://blog.tangjiujun.com/regexp.html</id>
+    <content type="html"><![CDATA[
+<h3 id="toc_0">元字符</h3>
+
+<ul>
+<li>&#39;.&#39; 匹配除换行符以外的任意字符</li>
+<li>&#39;\w&#39; 匹配字母、数字、下划线、汉字</li>
+<li>&#39;\W&#39; 匹配任意不是字母，数字，下划线，汉字的字符</li>
+<li>&#39;\s&#39; 匹配任意的空白符，包括空格、制表符(Tab)、换行符</li>
+<li>&#39;\S&#39; 匹配任意不是空白符的字符</li>
+<li>&#39;\d&#39; 匹配一个数字</li>
+<li>&#39;\D&#39; 匹配任意非数字的字符</li>
+<li>&#39;\b&#39; 匹配单词的开始或结束</li>
+<li>&#39;\B&#39; 匹配不是单词开头或结束的位置</li>
+<li>[abcde] 匹配 &#39;abcde&#39; 中任意一个字符</li>
+<li>[<sup>aeiou]</sup> 匹配除 ’aeiou‘ 以外的任意字符</li>
+<li>&#39;<sup>&#39;</sup> 匹配行首</li>
+<li>&#39;$&#39; 匹配行尾</li>
+<li>&#39;\A&#39; 匹配字符串开头</li>
+<li>&#39;\z&#39; 匹配字符串结尾</li>
+<li>&#39;\Z&#39; 匹配字符串结尾，如果字符串已 &#39;\n&#39; 结尾，不匹配最后的 &#39;\n&#39;</li>
+</ul>
+
+<span id="more"></span><!-- more -->
+
+<h3 id="toc_1">限定符</h3>
+
+<ul>
+<li>&#39;*&#39; 重复零次或更多次</li>
+<li>&#39;+&#39; 重复一次或更多次</li>
+<li>&#39;?&#39; 重复零次或一次</li>
+<li>&#39;{n}&#39; 重复n次</li>
+<li>&#39;{n,}&#39; 重复n次或更多次</li>
+<li>&#39;{n,m}&#39; 重复n到m次</li>
+</ul>
+
+<h3 id="toc_2">复杂规则</h3>
+
+<ul>
+<li><p>子表达式<br/>
+详见下面 &#39;###子表达式&#39;</p></li>
+<li><p>字符转义<br/>
+使用 &#39;\&#39; 来取消元字符的特殊意义，用于匹配元字符本身。<br/>
+例如：<code>foobar\.com</code> 匹配 &#39;foobar.com&#39;</p></li>
+<li><p>分支条件<br/>
+使用 &#39;|&#39; 指定几种规则，匹配其中任意一种<br/>
+例如：/foo|bar/ 匹配 &#39;foo&#39; 或 /foo|bar/ 匹配 &#39;bar&#39;</p></li>
+<li><p>贪婪和懒惰<br/>
+通常正则表达式在使得整个表达式能得到匹配的前提下尽可能多的匹配字符，这被称为贪婪匹配。<br/>
+有时我们需要尽可能少的匹配字符，可以在限定符后面加上一个 &#39;?&#39;，转换为懒惰匹配模式。<br/>
+例如：&#39;a.*b&#39; 匹配 &#39;aabab&#39;，而 &#39;a.*?b&#39; 匹配 &#39;aab&#39;</p></li>
+</ul>
+
+<h3 id="toc_3">子表达式</h3>
+
+<p>使用 &#39;()&#39; 建立子表达式（也叫分组），然后可对子表达式进行一些操作。</p>
+
+<ul>
+<li><p>重复多个字符<br/>
+例如：<code>(\d{1,3}\.){3}\d{1,3}</code> 匹配 &#39;4.55.666.7&#39;</p></li>
+<li><p>向后引用，用于重复搜索前面某个分组匹配的文本<br/>
+例如：&#39;/(\w+),(\1.*)/&#39; 匹配 &#39;foobar,foobar2&#39;</p></li>
+<li><p>捕获匹配内容<br/>
+匹配子表达式的文本（也就是分组捕获的内容）可以在表达式或其它程序中作进一步的处理。</p></li>
+<li><p>默认情况下，每个分组会自动拥有一个组号，规则是：从左向右，以分组的左括号为标志，第一个出现的分组的组号为1，第二个为2，以此类推。分组 0 对应整个正则表达式匹配的内容。</p></li>
+<li><p>也可以自己指定子表达式的组名，语法为：&#39;(?<GroupName>reg)&#39; 或 &quot;(?&#39;GroupName&#39;reg)&quot;。</p></li>
+<li><p>不捕获匹配的文本，也不给分组分配组号，语法为 &#39;(?:reg)&#39;。</p></li>
+<li><p>零宽断言<br/>
+用于查找在某些内容（但并不包括这些内容）之前或之后的东西。</p></li>
+<li><p>&#39;(?=exp)&#39; 前置断言，断言自身出现的位置的后面能匹配表达式 exp。<br/>
+例如：&#39;\w+(?=bar)&#39; 匹配以 bar 结尾的字符串，捕获内容不包含 bar。 &#39;foobar&#39; 捕获的内容为 &#39;foo&#39;</p></li>
+<li><p>&#39;(?&lt;=exp)&#39; 后置断言，断言自身出现的位置的前面能匹配表达式 exp。<br/>
+例如：&#39;(?&lt;=foo)\w+&#39; 匹配以 foo 开头的字符串，捕获内容不包含 &#39;foo&#39;。&#39;foobar&#39; 捕获的内容为 &#39;bar&#39;</p></li>
+<li><p>&#39;(?!exp)&#39; 前置非断言，断言此位置的前面不能匹配表达式 exp。<br/>
+例如：&#39;/\b(?!foo)\w+\b/&#39; 不匹配以 &#39;foo&#39; 开头的单词</p></li>
+<li><p><code>(?&lt;!exp)</code> 后置非断言，断言此位置的后面不能匹配表达式 exp<br/>
+例如：<code>/\b\w+(?&lt;!bar)\b/</code> 不匹配以 &#39;bar&#39; 结尾的单词</p></li>
+</ul>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Ruby 中 Enumerable 的一些方法]]></title>
+    <link href="http://blog.tangjiujun.com/ruby-enumerable.html"/>
+    <updated>2016-10-18T07:52:49+08:00</updated>
+    <id>http://blog.tangjiujun.com/ruby-enumerable.html</id>
+    <content type="html"><![CDATA[
+<h3 id="toc_0">判断列表</h3>
+
+<p><code>all?</code> <code>any?</code> <code>none?</code> <code>one?</code>如果有代码块，则以代码块的返回值判断；如果没有代码块，则用自身元素判断。<br/><br/>
+<code>all?</code> The method returns true if the block never returns false or nil<br/><br/>
+<code>any?</code> The method returns true if the block ever returns a value other than false or nil<br/><br/>
+<code>none?</code> The method returns true if the block never returns true for all elements<br/><br/>
+<code>one?</code> The method returns true if the block returns true exactly once</p>
+
+<pre><code class="language-ruby">[1, 2, 3, 4].all? { |x| x&lt;3 }   # false
+[1, 2, 3, 4].any? { |x| x&lt;3 }   # true
+[1, 2, 3, 4].none? { |x| x&lt;1 }  # true
+[1, 2, 3, 4].one? { |x| x&lt;1 }  # false
+</code></pre>
+
+<p><code>include?</code> 和 <code>member?</code> 是否包含某个元素</p>
+
+<span id="more"></span><!-- more -->
+
+<h3 id="toc_1">筛选列表中的元素</h3>
+
+<p><code>select</code> 和 <code>find_all</code> 选择代码块中为 true 的元素</p>
+
+<pre><code class="language-ruby">[1, 2, 3, 4].select { |x| x &lt; 3 }   # [1, 2]
+</code></pre>
+
+<p><code>reject</code> 选择代码块中为 false 的元素</p>
+
+<pre><code class="language-ruby">[1, 2, 3, 4].reject { |x| x &lt; 3 }   # [3, 4]
+</code></pre>
+
+<p><code>detect</code> 和 <code>find</code> Returns the first for which block is not false</p>
+
+<pre><code class="language-ruby">[1, 2, 3, 4].detect{|x| x &gt;2}    # 3
+[1, 2, 3, 4].find(Proc.new { 0 }) { |x| x &lt; 1 }   # 0
+</code></pre>
+
+<h3 id="toc_2">对列表中的元素进行操作</h3>
+
+<p><code>collect</code> 和 <code>map</code> Returns a new array with the results of running block once for every element in enum.</p>
+
+<pre><code class="language-ruby">[1, 2, 3, 4].map(&amp;:to_s)    # [&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;]
+</code></pre>
+
+<p><code>inject</code> 和 <code>reduce</code></p>
+
+<pre><code class="language-ruby">(5..10).reduce(:+)                            # 45
+(5..10).inject {|sum, n| sum + n }            # 45
+(5..10).reduce(0, :+)                         # 45
+(5..10).inject{|max, x| max &gt; x ? max : x }   # 10
+</code></pre>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[使用 EventMachine 实现简单的服务端]]></title>
+    <link href="http://blog.tangjiujun.com/em-http-server.html"/>
+    <updated>2016-10-18T07:52:49+08:00</updated>
+    <id>http://blog.tangjiujun.com/em-http-server.html</id>
+    <content type="html"><![CDATA[
+<h3 id="toc_0">一个简单的 HTTP Server 例子</h3>
+
+<pre><code class="language-ruby">require &#39;eventmachine&#39;
+require &#39;em-http-server&#39;
+
+class HTTPHandler &lt; EM::HttpServer::Server
+  # 请求从这里开始执行
+  def process_http_request
+    @http # 包含所有 http headers 的 hash
+    @http_content # http body
+
+    # 构造 http response
+    response = EventMachine::DelegatedHttpResponse.new(self)
+    response.status = 200
+    response.content = &#39;hello, world!&#39;
+    response.send_response
+  end
+
+  # 请求发生异常时的回调方法
+  def http_request_errback e
+    puts &quot;#{e.backtrace.shift}: #{e.message} (#{e.class})&quot;
+    puts e.backtrace.map{|line| &quot;\tfrom #{line}&quot;}
+  end
+end
+
+EM.run do
+  # hit Control + C to stop
+  Signal.trap(&quot;INT&quot;)  { EventMachine.stop }
+  Signal.trap(&quot;TERM&quot;) { EventMachine.stop }
+
+  EM.start_server &#39;localhost&#39;, 10000, HTTPHandler
+end
+</code></pre>
+
+<span id="more"></span><!-- more -->
+
+<h3 id="toc_1">请求解析错误时，自定义错误返回信息</h3>
+
+<blockquote>
+<p>在 <code>HTTPHandler</code> 中实现 <code>http_error_string</code> 方法，返回值就是返回信息。</p>
+</blockquote>
+
+<h3 id="toc_2">与 EventMachine 的关系</h3>
+
+<blockquote>
+<p><code>EM::HttpServer::Server</code> &lt; <code>EM::P::HeaderAndContentProtocol</code> &lt; <code>EM::Connection</code></p>
+</blockquote>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[使用 Nokogiri 构建和解析 XML]]></title>
+    <link href="http://blog.tangjiujun.com/nokogiri-handle-xml.html"/>
+    <updated>2016-10-18T07:52:49+08:00</updated>
+    <id>http://blog.tangjiujun.com/nokogiri-handle-xml.html</id>
+    <content type="html"><![CDATA[
+<h3 id="toc_0">构建 XML</h3>
+
+<ul>
+<li><p>全新构建一个 XML</p>
+<pre><code class="language-ruby">builder = Nokogiri::XML::Builder.new(:encoding =&gt; &#39;UTF-8&#39;) do |xml|
+xml.envelope {<br/>
+  xml.header(:identifier =&gt; &#39;IDENTIFIER&#39;) {<br/>
+    xml.type(&#39;TYPE&#39;)<br/>
+  }<br/>
+  xml.content<br/>
+}<br/>
+end
+</code></pre>
+<span id="more"></span><!-- more --></li>
+<li><p>在已有 XML 上追加子节点</p>
+<pre><code class="language-ruby"># 第一种方法
+content_element = builder.doc.at(&#39;content&#39;)<br/>
+content_element.inner_html = &#39;&lt;source&gt;web&lt;/source&gt;&#39;<br/>
+# 第二种方法<br/>
+content_element.add_child(&#39;&lt;result&gt;SUCCESS&lt;/result&gt;&#39;)<br/>
+# 此处调用的是 Nokogiri::XML::Element 的实例方法 &lt;&lt;<br/>
+content_element &lt;&lt; &#39;&lt;reason&gt;REASON&lt;/reason&gt;&#39;<br/>
+# 第三种方法<br/>
+Nokogiri::XML::Builder.with(builder.doc.root) do |xml|<br/>
+xml.footer(&#39;FOOTER&#39;)<br/>
+xml.destination {<br/>
+  xml.ip(&#39;IP&#39;)<br/>
+  # 此处调用的是 Nokogiri::XML::Builder 的实例方法 &lt;&lt;<br/>
+  xml &lt;&lt; &#39;&lt;port&gt;80&lt;/port&gt;&#39;<br/>
+}<br/>
+end
+</code></pre></li>
+<li><p>修改某个节点的内容</p>
+<pre><code class="language-ruby">reason_element = builder.doc.at(&#39;reason&#39;)
+reason_element.content = &#39;MODIFY REASON&#39;
+</code></pre></li>
+<li><p>替换某个节点</p>
+<pre><code class="language-ruby">reason_element.replace(&#39;&lt;reason&gt;REPLACE REASON&lt;/reason&gt;&#39;)
+</code></pre></li>
+<li><p>增加或修改某个节点的属性</p>
+<pre><code class="language-ruby">reason_element[&#39;type&#39;] = &#39;warning&#39;
+</code></pre></li>
+<li><p>删除某个节点</p>
+<pre><code class="language-ruby">reason_element.unlink
+content_element.remove
+</code></pre></li>
+<li><p>输出 XML</p>
+<pre><code class="language-ruby">builder.to_xml
+</code></pre></li>
+</ul>
+
+<h3 id="toc_1">解析 XML</h3>
+
+<p>假如我们有如下 XML</p>
+
+<pre><code class="language-ruby">xml_string = &#39;&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;envelope&gt;
+  &lt;header identifier=&quot;IDENTIFIER&quot;&gt;
+    &lt;type&gt;DOWNLOAD&lt;/type&gt;
+  &lt;/header&gt;
+  &lt;content&gt;
+    &lt;result&gt;SUCCESS&lt;/result&gt;
+    &lt;files&gt;
+      &lt;file&gt;a&lt;/file&gt;
+      &lt;file&gt;b&lt;/file&gt;
+      &lt;file&gt;c&lt;/file&gt;
+    &lt;/files&gt;
+  &lt;/content&gt;
+  &lt;destination&gt;
+    &lt;type&gt;INNER NETWORK&lt;/type&gt;
+    &lt;ip&gt;IP&lt;/ip&gt;
+    &lt;port&gt;80&lt;/port&gt;
+  &lt;/destination&gt;
+&lt;/envelope&gt;&#39;
+</code></pre>
+
+<p>实例化 XML 对象</p>
+
+<pre><code class="language-ruby">doc = Nokogiri::XML(xml_string) { |config|
+  config.noblanks # 格式化 XML
+}
+</code></pre>
+
+<p>根据 xpath 和 css 方式搜索整个XML节点，返回一个 <code>Nokogiri::XML::NodeSet</code> 对象</p>
+
+<pre><code class="language-ruby">doc.xpath(&#39;//type&#39;)
+doc.xpath(&#39;//header/type&#39;
+
+doc.css(&#39;type&#39;)
+doc.css(&#39;header type&#39;)
+
+doc.search(&#39;//type&#39;)
+doc.search(&#39;type&#39;)
+</code></pre>
+
+<p>根据 xpath 和 css 方式返回最先找到的第一个 XML 节点，返回一个 <code>Nokogiri::XML::Node</code> 对象</p>
+
+<pre><code class="language-ruby">doc.at_xpath(&#39;//type&#39;)
+doc.at_css(&#39;type&#39;)
+doc.at(&#39;//type&#39;)
+doc.at(&#39;type&#39;)
+</code></pre>
+
+<p>获取某个节点的属性</p>
+
+<pre><code class="language-ruby">header_element = doc.at(&#39;header&#39;)
+header_element.attr(&#39;identifier&#39;) # 单个属性的值
+header_element.attributes # 所有属性的 Hash
+header_element.attribute_nodes # 所有属性的 Array
+</code></pre>
+
+<p>获取某个节点下的子节点</p>
+
+<pre><code class="language-ruby">header_element.elements
+header_element.element_children
+</code></pre>
+
+<p>获取某个节点的祖先节点</p>
+
+<pre><code class="language-ruby">header_element.ancestors
+</code></pre>
+
+<p>获取某个节点下的第一个和最后一个子节点，没有则返回 nil</p>
+
+<pre><code class="language-ruby">header_element.first_element_child
+header_element.last_element_child
+</code></pre>
+
+<p>输出某个节点下 XML 字符串</p>
+
+<pre><code class="language-ruby">header_element.canonicalize # 包含节点自身
+header_element.inner_html # 仅输出子节点
+</code></pre>
+
+<h3 id="toc_2">Nokogiri 中 XML 节点对象的关系</h3>
+
+<ul>
+<li><code>Nokogiri::XML::NodeSet</code> 包含多个 <code>Nokogiri::XML::Node</code></li>
+<li>每个节点都是一个 <code>Nokogiri::XML::Element</code> 实例，继承自 <code>Nokogiri::XML::Node</code></li>
+<li>节点间联系：
+<code>ruby
+Nokogiri::XML::Element attributes={&#39;name&#39; =&gt; Nokogiri::XML::Attr} children=Nokogiri::XML::NodeSet
+</code></li>
+</ul>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Ruby 中使用 Thrift 实现 RPC 调用]]></title>
+    <link href="http://blog.tangjiujun.com/ruby-thrift-rpc.html"/>
+    <updated>2016-10-18T07:52:49+08:00</updated>
+    <id>http://blog.tangjiujun.com/ruby-thrift-rpc.html</id>
+    <content type="html"><![CDATA[
+<h3 id="toc_0">Thrift 框架简介</h3>
+
+<blockquote>
+<p>Apache Thrift 是 Facebook 实现的一种高效的、支持多种编程语言的远程服务调用的框架。<br/>
+详情参考<a href="http://thrift.apache.org/docs/">官方文档</a></p>
+</blockquote>
+
+<h3 id="toc_1">定义 .thrift 文件</h3>
+
+<pre><code class="language-text">namespace rb model
+
+struct User {
+  1: i32 id,
+  2: string name,
+}
+
+service UserStorage {
+  void set_user(1: User user),
+  User get_user(1: i32 id),
+}
+</code></pre>
+
+<span id="more"></span><!-- more -->
+
+<p>运行 <code>thrift --gen rb user.thrift</code>，会在 <code>gen-rb</code> 目录下生成 <code>user_constants.rb, user_types.rb, user_storage.rb</code> 三个文件。</p>
+
+<h3 id="toc_2">定义服务端</h3>
+
+<pre><code class="language-ruby"># -*- coding: utf-8 -*-
+$:.push(&#39;gen-rb&#39;)
+
+require &#39;thrift&#39;
+require &#39;user_constants&#39;
+require &#39;user_storage&#39;
+
+class UserHandler
+  def set_user(user)
+    puts &#39;Set user: &#39; + user.inspect
+  end
+
+  def get_user(id)
+    return Model::User.new(:id =&gt; id, :name =&gt; &quot;Name: #{id}&quot;)
+  end
+end
+
+processor = Model::UserStorage::Processor.new(UserHandler.new())
+transport = Thrift::ServerSocket.new(9090)
+transportFactory = Thrift::BufferedTransportFactory.new()
+server = Thrift::SimpleServer.new(processor, transport, transportFactory)
+
+puts &quot;Starting the server...&quot;
+server.serve()
+puts &quot;Stoped the server...&quot;
+</code></pre>
+
+<p>实现对应的服务操作，并打开 9090 端口等待客户端调用</p>
+
+<h3 id="toc_3">客户端调用</h3>
+
+<pre><code class="language-ruby"># -*- coding: utf-8 -*-
+$:.push(&#39;gen-rb&#39;)
+
+require &#39;thrift&#39;
+require &#39;user_constants&#39;
+require &#39;user_storage&#39;
+
+begin
+  transport = Thrift::BufferedTransport.new(Thrift::Socket.new(&#39;0.0.0.0&#39;, &#39;9090&#39;))
+  protocol = Thrift::BinaryProtocol.new(transport)
+  client = Model::UserStorage::Client.new(protocol)
+  transport.open()
+
+  user = Model::User.new(:id =&gt; 1, :name =&gt; &#39;foo&#39;)
+
+  puts client.set_user(user).inspect # =&gt; nil
+  puts client.get_user(2).inspect # =&gt; &lt;Model::User id:2, name:&quot;Name: 2&quot;&gt;
+
+  transport.close()
+rescue Thrift::TransportException =&gt; e
+  puts &quot;Thrift::Exception: #{e.message}&quot;
+end
+</code></pre>
+
+]]></content>
+  </entry>
+  
+</feed>

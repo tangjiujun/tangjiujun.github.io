@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url>
+  <loc>http://blog.tangjiujun.com/</loc>
+  <lastmod>2018-10-12T11:18:23+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/spring-data-jpa-handle-amount.html</loc>
+  <lastmod>2018-02-26T10:50:50+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/mysql-innodb-locks.html</loc>
+  <lastmod>2017-06-08T22:05:01+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/db-trigger-create.html</loc>
+  <lastmod>2016-06-11T08:00:00+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/java-dynamic-proxy.html</loc>
+  <lastmod>2016-04-23T08:00:00+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/mysql-innodb-mvcc.html</loc>
+  <lastmod>2016-04-17T07:48:33+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/spring-amqp-usage.html</loc>
+  <lastmod>2016-03-21T08:00:00+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/spring-boot-integration-test.html</loc>
+  <lastmod>2016-02-01T08:00:00+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/spring-data-redis-usage.html</loc>
+  <lastmod>2016-01-09T08:00:00+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/spring-data-jpa-one-to-one.html</loc>
+  <lastmod>2015-11-25T08:00:00+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/spring-data-jpa-one-to-many.html</loc>
+  <lastmod>2015-10-30T08:00:00+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/java-file-watcher.html</loc>
+  <lastmod>2015-10-15T08:00:00+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/spring-boot-load-config.html</loc>
+  <lastmod>2015-09-26T08:00:00+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/regexp.html</loc>
+  <lastmod>2015-09-18T08:00:00+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/ruby-enumerable.html</loc>
+  <lastmod>2015-01-10T08:00:00+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/em-http-server.html</loc>
+  <lastmod>2014-12-12T08:00:00+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/nokogiri-handle-xml.html</loc>
+  <lastmod>2014-07-19T08:00:49+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/ruby-thrift-rpc.html</loc>
+  <lastmod>2014-04-02T08:00:00+08:00</lastmod>
+</url>
+
+
+<url>
+  <loc>http://blog.tangjiujun.com/about-me.html</loc>
+  <lastmod>2018-04-20T13:30:02+08:00</lastmod>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/projects.html</loc>
+  <lastmod>2016-10-18T14:28:41+08:00</lastmod>
+</url>
+
+
+<url>
+  <loc>http://blog.tangjiujun.com/Java.html</loc>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/Ruby.html</loc>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/Others.html</loc>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/Database.html</loc>
+</url>
+
+<url>
+  <loc>http://blog.tangjiujun.com/Spring%20Boot.html</loc>
+</url>
+
+
+</urlset>

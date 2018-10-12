@@ -1,0 +1,474 @@
+<!doctype html>
+<html class="no-js" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+    
+  Database - TangJiujun's Techblog
+  
+  </title>
+  
+  
+  <link href="atom.xml" rel="alternate" title="TangJiujun's Techblog" type="application/atom+xml">
+    <link rel="stylesheet" href="asset/css/foundation.min.css" />
+    <link rel="stylesheet" href="asset/css/docs.css" />
+    <script src="asset/js/vendor/modernizr.js"></script>
+    <script src="asset/js/vendor/jquery.js"></script>
+  <script src="asset/highlightjs/highlight.pack.js"></script>
+  <link href="asset/highlightjs/styles/github.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script>hljs.initHighlightingOnLoad();</script>
+<script type="text/javascript">
+  function before_search(){
+    var searchVal = 'site:blog.tangjiujun.com ' + document.getElementById('search_input').value;
+    document.getElementById('search_q').value = searchVal;
+    return true;
+  }
+</script>
+  </head>
+  <body class="antialiased hide-extras">
+    
+    <div class="marketing off-canvas-wrap" data-offcanvas>
+      <div class="inner-wrap">
+
+
+<nav class="top-bar docs-bar hide-for-small" data-topbar>
+
+
+  <section class="top-bar-section">
+  <div class="row">
+      <div style="position: relative;width:100%;"><div style="position: absolute; width:100%;">
+        <ul id="main-menu" class="left">
+        
+        <li id=""><a target="_self" href="index.html">Home</a></li>
+        
+        <li id=""><a target="_self" href="archives.html">Archives</a></li>
+        
+        <li id=""><a target="_self" href="projects.html">Projects</a></li>
+        
+        <li id=""><a target="_self" href="about.html">About</a></li>
+        
+        </ul>
+
+        <ul class="right" id="search-wrap">
+          <li>
+<form target="_blank" onsubmit="return before_search();" action="https://google.com/search" method="get">
+    <input type="hidden" id="search_q" name="q" value="" />
+    <input tabindex="1" type="search" id="search_input"  placeholder="Search"/>
+</form>
+</li>
+          </ul>
+      </div></div>
+  </div>
+  </section>
+
+</nav>
+
+        <nav class="tab-bar show-for-small">
+  <a href="javascript:void(0)" class="left-off-canvas-toggle menu-icon">
+    <span> &nbsp; TangJiujun's Techblog</span>
+  </a>
+</nav>
+
+<aside class="left-off-canvas-menu">
+      <ul class="off-canvas-list">
+        
+        <li><a target="_self" href="index.html">Home</a></li>
+        
+        <li><a target="_self" href="archives.html">Archives</a></li>
+        
+        <li><a target="_self" href="projects.html">Projects</a></li>
+        
+        <li><a target="_self" href="about.html">About</a></li>
+        
+
+    <li><label>Categories</label></li>
+
+        
+            <li><a href="Java.html">Java</a></li>
+        
+            <li><a href="Ruby.html">Ruby</a></li>
+        
+            <li><a href="Others.html">Others</a></li>
+        
+            <li><a href="Database.html">Database</a></li>
+        
+            <li><a href="Spring%20Boot.html">Spring Boot</a></li>
+         
+
+      </ul>
+    </aside>
+
+<a class="exit-off-canvas" href="#"></a>
+
+
+        <section id="main-content" role="main" class="scroll-container">
+        
+       
+
+ <script type="text/javascript">
+	$(function(){
+		$('#menu_item_index').addClass('is_active');
+	});
+</script>
+<div class="row">
+	<div class="large-8 medium-8 columns">
+		<div class="markdown-body home-categories">
+		
+			<div class="article">
+                <a class="clearlink" href="mysql-innodb-locks.html">
+                
+                  <h1>关于 MySQL 中 InnoDB 事务锁的一些理解</h1>
+                  <div class="a-content">
+                      
+                      <div class="a-content-text">
+                        
+                        	<h2 id="toc_0">InnoDB 行锁</h2>
+
+<blockquote>
+<p>参考 <a href="http://mysql.taobao.org/monthly/2016/01/01/">MySQL · 引擎特性 · InnoDB 事务锁系统简介</a><br/>
+<a href="https://dev.mysql.com/doc/refman/5.7/en/innodb-locks-set.html">Locks Set by Different SQL Statements in InnoDB</a></p>
+</blockquote>
+
+<h4 id="toc_1">区间锁（LOCK_GAP）</h4>
+
+<p>锁住一段范围，不锁记录本身，通常表示两个索引记录之间，或者索引上的第一条记录之前，或者最后一条记录之后的锁。一般在 RR 隔离级别下会使用。</p>
+
+<h5 id="toc_2">Next-Key 锁（LOCK_ORDINARY）</h5>
+
+<p>其实就是锁住 待插入记录本身 + 记录之前的 GAP，Next-Key 锁用于解决 RR 隔离级别下的幻读问题。</p>
+
+<p>通常对于 UPDATE 或 DELETE 或 SELECT … FOR UPDATE 或 SELECT … IN SHARE MODE 操作：</p>
+
+<ul>
+<li>查询条件为唯一索引且是唯一等值查询时，只对记录本身加锁 </li>
+<li>非唯一条件查询，或者查询会扫描到多条记录，加 Next-Key 锁</li>
+</ul>
+
+
+                        
+                      </div>
+                  </div>
+                </a>
+                <div class="read-more clearfix">
+                  <div class="more-left left">
+                   <a href="mysql-innodb-locks.html">Read more</a>&nbsp;&nbsp; 
+                    <span class="date">2017/6/8</span>
+                    <span>posted in&nbsp;</span> 
+          				  
+          					    <span class="posted-in"><a href='Database.html'>Database</a></span>
+          				   
+                  </div>
+                  <div class="more-right right">
+                  <span class="comments">
+                      
+                        <a href="http://blog.tangjiujun.com/mysql-innodb-locks.html#disqus_thread">comments</a>
+                      
+
+                       
+                  </span>
+                  </div>
+                </div>
+              </div><!-- article -->
+        
+			<div class="article">
+                <a class="clearlink" href="db-trigger-create.html">
+                
+                  <h1>MySQL、SQL Server 和 Oracle 触发器的创建</h1>
+                  <div class="a-content">
+                      
+                      <div class="a-content-text">
+                        
+                        	<blockquote>
+<p>场景：当 users 表在 insert，update，delete 时，在 users_log 表中记录变更的 id</p>
+</blockquote>
+
+<h3 id="toc_0">MySQL</h3>
+
+<p>触发时机：BEFORE，AFTER<br/>
+触发事件：INSERT，UPDATE，DELETE<br/>
+NEW 和 OLD 关键字：</p>
+
+<p>| action |      NEW       |      OLD       |<br/>
+  |--------|----------------|----------------|<br/>
+  | insert | 插入的新数据   | 无             |<br/>
+  | update | 修改为的新数据 | 被修改的原数据 |<br/>
+  | delete | 无             | 被删除的原数据 |</p>
+
+<pre><code class="language-sql">DELIMITER $
+CREATE TRIGGER insert_user AFTER INSERT
+ON users FOR EACH ROW 
+BEGIN
+    INSERT INTO users_log(user_id, action) VALUES(NEW.id, &#39;insert&#39;);
+END$
+DELIMITER ;
+</code></pre>
+
+
+                        
+                      </div>
+                  </div>
+                </a>
+                <div class="read-more clearfix">
+                  <div class="more-left left">
+                   <a href="db-trigger-create.html">Read more</a>&nbsp;&nbsp; 
+                    <span class="date">2016/6/11</span>
+                    <span>posted in&nbsp;</span> 
+          				  
+          					    <span class="posted-in"><a href='Database.html'>Database</a></span>
+          				   
+                  </div>
+                  <div class="more-right right">
+                  <span class="comments">
+                      
+                        <a href="http://blog.tangjiujun.com/db-trigger-create.html#disqus_thread">comments</a>
+                      
+
+                       
+                  </span>
+                  </div>
+                </div>
+              </div><!-- article -->
+        
+			<div class="article">
+                <a class="clearlink" href="mysql-innodb-mvcc.html">
+                
+                  <h1>关于 MySQL 中 InnoDB 的 MVCC 的一些理解</h1>
+                  <div class="a-content">
+                      
+                      <div class="a-content-text">
+                        
+                        	<p>在 MySQL 中 InnoDB 的 MVCC 实现机制是给每行记录增加三个隐藏字段：</p>
+
+<ul>
+<li>6 字节的 DB_TRX_ID，用于记录最近一次插入或更新的事务标示。删除也是一种更新，用一个特殊的字节表示该行已删除。</li>
+<li>7 字节的 DB_ROLL_PTR，回滚指针，指向 undo log 记录。</li>
+<li>6 字节的 DB_ROW_ID，自增长的 row ID。<br/>
+参考：<a href="http://dev.mysql.com/doc/refman/5.7/en/innodb-multi-versioning.html">InnoDB Multi-Versioning</a></li>
+</ul>
+
+
+                        
+                      </div>
+                  </div>
+                </a>
+                <div class="read-more clearfix">
+                  <div class="more-left left">
+                   <a href="mysql-innodb-mvcc.html">Read more</a>&nbsp;&nbsp; 
+                    <span class="date">2016/4/17</span>
+                    <span>posted in&nbsp;</span> 
+          				  
+          					    <span class="posted-in"><a href='Database.html'>Database</a></span>
+          				   
+                  </div>
+                  <div class="more-right right">
+                  <span class="comments">
+                      
+                        <a href="http://blog.tangjiujun.com/mysql-innodb-mvcc.html#disqus_thread">comments</a>
+                      
+
+                       
+                  </span>
+                  </div>
+                </div>
+              </div><!-- article -->
+        
+              
+
+
+			<div class="row">
+			  <div class="large-6 columns">
+			  <p class="text-left" style="padding-top:25px;">
+			   
+			  </p>
+			  </div>
+			  <div class="large-6 columns">
+			<p class="text-right" style="padding-top:25px;">
+			
+			</p>
+			  </div>
+			</div>
+		</div>
+	</div><!-- large 8 -->
+
+ <div class="large-4 medium-4 columns">
+  <div class="hide-for-small">
+    <div id="sidebar" class="sidebar">
+          <div id="site-info" class="site-info">
+            
+                <div class="site-a-logo"><img src="media/avatar.png" /></div>
+            
+                <h1>TangJiujun's Techblog</h1>
+                <div class="site-des"></div>
+                <div class="social">
+
+
+
+
+
+
+
+
+
+<a target="_blank" class="github" target="_blank" href="https://github.com/tangjiujun" title="GitHub">GitHub</a>
+<a target="_blank" class="email" href="mailto:jiujun.tang@gmail.com" title="Email">Email</a>
+  <a target="_blank" class="rss" href="atom.xml" title="RSS">RSS</a>
+                
+              	 </div>
+          	</div>
+
+             
+
+              <div id="site-categories" class="side-item ">
+                <div class="side-header">
+                  <h2>Categories</h2>
+                </div>
+                <div class="side-content">
+
+      	<p class="cat-list">
+        
+            <a href="Java.html"><strong>Java</strong></a>
+        
+            <a href="Ruby.html"><strong>Ruby</strong></a>
+        
+            <a href="Others.html"><strong>Others</strong></a>
+        
+            <a href="Database.html"><strong>Database</strong></a>
+        
+            <a href="Spring%20Boot.html"><strong>Spring Boot</strong></a>
+         
+        </p>
+
+
+                </div>
+              </div>
+
+              <div id="site-categories" class="side-item">
+                <div class="side-header">
+                  <h2>Recent Posts</h2>
+                </div>
+                <div class="side-content">
+                <ul class="posts-list">
+	      
+		      
+			      <li class="post">
+			        <a href="spring-data-jpa-handle-amount.html">使用 Spring Data JPA 操作大量数据</a>
+			      </li>
+		     
+		  
+		      
+			      <li class="post">
+			        <a href="mysql-innodb-locks.html">关于 MySQL 中 InnoDB 事务锁的一些理解</a>
+			      </li>
+		     
+		  
+		      
+			      <li class="post">
+			        <a href="db-trigger-create.html">MySQL、SQL Server 和 Oracle 触发器的创建</a>
+			      </li>
+		     
+		  
+		      
+			      <li class="post">
+			        <a href="java-dynamic-proxy.html">代理模式及 Java 实现动态代理</a>
+			      </li>
+		     
+		  
+		      
+			      <li class="post">
+			        <a href="mysql-innodb-mvcc.html">关于 MySQL 中 InnoDB 的 MVCC 的一些理解</a>
+			      </li>
+		     
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		  
+		      
+		   
+		  		</ul>
+                </div>
+              </div>
+        </div><!-- sidebar -->
+      </div><!-- hide for small -->
+</div><!-- large 4 -->
+
+</div><!-- row -->
+
+ <div class="page-bottom clearfix">
+  <div class="row">
+   <p class="copyright">Copyright &copy; 2015
+Powered by <a target="_blank" href="http://www.mweb.im">MWeb</a>,&nbsp; 
+Theme used <a target="_blank" href="http://github.com">GitHub CSS</a>.</p>
+  </div>
+</div>
+
+        </section>
+      </div>
+    </div>
+
+
+<script type="text/javascript">
+    var disqus_shortname = 'tangjiujun'; 
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<script type="text/javascript">
+var disqus_shortname = 'tangjiujun'; 
+
+(function () {
+var s = document.createElement('script'); s.async = true;
+s.type = 'text/javascript';
+s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+(document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+}());
+</script>
+  
+    
+
+    <script src="asset/js/foundation.min.js"></script>
+    <script>
+      $(document).foundation();
+      function fixSidebarHeight(){
+        var w1 = $('.markdown-body').height();
+          var w2 = $('#sidebar').height();
+          if (w1 > w2) { $('#sidebar').height(w1); };
+      }
+      $(function(){
+        fixSidebarHeight();
+      })
+      $(window).load(function(){
+          fixSidebarHeight();
+      });
+     
+    </script>
+
+    
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script><script type="text/x-mathjax-config">MathJax.Hub.Config({TeX: { equationNumbers: { autoNumber: "AMS" } }});</script>
+
+
+  </body>
+</html>
